@@ -1,0 +1,18 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Lector de códigos SKU</title><style>*{box-sizing:border-box}body{margin:0;background:#101a2a;color:#fff;font:17px system-ui,sans-serif;padding:20px}.app{max-width:720px;margin:auto}h1{font-size:26px}p{line-height:1.5;color:#d4dfec}#reader{background:#fff;color:#111;border-radius:16px;overflow:hidden;min-height:240px}button{width:100%;padding:18px;border:0;border-radius:12px;background:#f5b82e;font-size:18px;font-weight:800;margin-top:14px}#status{padding:12px;color:#fff}.tag{color:#f5b82e;font-weight:800;letter-spacing:2px}small{color:#cad4e2}</style><script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script></head><body><div class="app"><div class="tag">ALMACÉN · SKU</div><h1>📷 Escanear código de barras</h1><p>Enfoca el código de barras del producto. La lectura es automática.</p><div id="reader"></div><div id="status" role="status">Preparando cámara…</div><button id="retry" onclick="iniciar()">Reintentar cámara</button><p><small>Formatos: EAN-8, EAN-13, UPC-A, UPC-E, Code 128, Code 39 e ITF. Requiere HTTPS y conexión a Internet.</small></p></div><script>
+const p=new URLSearchParams(location.search),ret=p.get('returnUrl'),dest=p.get('destino')==='registro'?'registro':'consulta';
+const statusEl=document.getElementById('status');let scanner=null,busy=false;
+function retornoSeguro(){try{const u=new URL(ret);return u.protocol==='https:'&&(/(^|\.)script\.google\.com$/.test(u.hostname))&&u.pathname.includes('/macros/s/')&&u.pathname.endsWith('/exec')?u:null}catch{return null}}
+async function iniciar(){
+ if(!retornoSeguro()){statusEl.textContent='Enlace de regreso inválido. Abre el lector desde la aplicación de SKUs.';return}
+ if(typeof Html5Qrcode==='undefined'){statusEl.textContent='No se pudo cargar la librería. Comprueba tu conexión.';return}
+ if(scanner){try{if(scanner.isScanning)await scanner.stop();scanner.clear()}catch(e){}}
+ scanner=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.ITF],verbose:false});
+ statusEl.textContent='Solicitando permiso para usar la cámara…';busy=false;
+ try{await scanner.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>({width:Math.max(140,Math.floor(w*.85)),height:Math.max(90,Math.floor(Math.min(h*.36,150)) )})},async code=>{
+ if(busy)return;const value=String(code).trim();if(!/^\d{8,14}$/.test(value)){statusEl.textContent='Se leyó un código no numérico o de longitud no compatible. Prueba otro código.';return}
+ busy=true;statusEl.textContent='Código leído: '+value+'. Regresando al sistema…';try{await scanner.stop()}catch(e){}
+ const url=retornoSeguro();url.searchParams.set('ean',value);url.searchParams.set('destino',dest);location.replace(url.toString());
+ },()=>{});statusEl.textContent='Cámara activa. Apunta al código de barras.'}catch(e){statusEl.textContent='No se pudo iniciar la cámara: '+(e.message||e)+'. Revisa los permisos del navegador.'}
+}
+window.addEventListener('load',iniciar);
+</script></body></html>

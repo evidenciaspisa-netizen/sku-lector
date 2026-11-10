@@ -18,8 +18,16 @@ async function iniciar(){
  try{await scanner.start({facingMode:'environment'},{fps:12,aspectRatio:1.7778,qrbox:(w,h)=>({width:Math.min(w-20,350),height:Math.min(Math.max(75,h*.35),120)})},async code=>{
  if(busy)return;const value=String(code).trim();if(!/^\d{8,14}$/.test(value)){statusEl.textContent='Se detectó un código incompatible. Intenta con un EAN numérico.';return}
  busy=true;ultimo=value;document.getElementById('code').textContent=value;document.getElementById('result').style.display='block';
- statusEl.textContent='¡Código leído correctamente!';try{await scanner.stop()}catch(e){}
- const url=retornoSeguro();if(url){url.searchParams.set('ean',value);url.searchParams.set('destino',dest);statusEl.textContent='¡Código leído! Regresando a SKUs…';location.replace(url.toString())}
+ statusEl.textContent='¡Código leído! Enviando al formulario…';
+ // Enviar inmediatamente, ANTES de esperar el cierre de la cámara.
+ let confirmado=false;
+ const ack=(event)=>{if(event.data?.tipo==='SKU_RECIBIDO' && event.origin.includes('googleusercontent.com')){confirmado=true;window.removeEventListener('message',ack);statusEl.textContent='Código enviado correctamente';try{window.close()}catch(e){}}};
+ window.addEventListener('message',ack);
+ if(window.opener && !window.opener.closed){try{window.opener.postMessage({tipo:'SKU_EAN',ean:value,destino:dest},'*')}catch(e){}}
+ try{await scanner.stop()}catch(e){}
+ const url=retornoSeguro();
+ // Respaldo: si el navegador no permite comunicar las pestañas, recargar como antes.
+ setTimeout(()=>{if(!confirmado && url){url.searchParams.set('ean',value);url.searchParams.set('destino',dest);location.replace(url.toString())}},1400);
  },()=>{});statusEl.textContent=retornoSeguro()?'Cámara lista. Enfoca el código.':'Modo de prueba: escanea aquí; para regresar automáticamente, abre la cámara desde la app de SKUs.'}
  catch(e){statusEl.textContent='No se pudo abrir la cámara: '+(e?.message||e)+'. Verifica permisos en el navegador y prueba Reintentar.'}
 }
